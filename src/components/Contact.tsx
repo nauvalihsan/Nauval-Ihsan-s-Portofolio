@@ -3,11 +3,11 @@ import SplitHeading from "./SplitHeading";
 
 export default function Contact() {
   return (
-    <footer className="bg-[linear-gradient(to_bottom,#000_0%,#9a9a9a_30%,#fafafa_50%)] text-black">
+    <footer id ="contact" className="bg-[linear-gradient(to_bottom,#000_0%,#9a9a9a_30%,#fafafa_50%)] text-black">
       {/* Zona transisi hitam ke putih */}
       <div className="h-[50vh]" aria-hidden />
 
-      <div id="contact" className="flex min-h-screen flex-col px-6 pb-10 pt-24 md:px-12 md:pt-28">
+      <div className="flex min-h-screen flex-col px-6 pb-10 pt-24 md:px-12 md:pt-28">
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
           <SplitHeading
             once={false}

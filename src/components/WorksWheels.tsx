@@ -70,16 +70,25 @@ const WHEEL_UNITS = 900;
 const DRAG_UNITS = 420;
 /** Quiet time after the last wheel event before the wheel settles on an item. */
 const SETTLE = 140;
-/** Number of downward wheel gestures required at the final project before the page can continue. */
-const END_SCROLL_GESTURES = 4;
 /** Events within this window are considered part of the same wheel gesture. */
 const END_GESTURE_GAP = 220;
 /** Fraction of the remaining distance closed each frame. 1 = no smoothing. */
 const EASE = 0.12;
+const START_EPS = 0.001;
+const SWIPE_MIN = 30;
+
 
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** Normalise wheel deltas to pixels (Firefox reports lines/pages). */
+const wheelPixels = (event: WheelEvent) =>
+  event.deltaMode === 1
+    ? event.deltaY * 16
+    : event.deltaMode === 2
+      ? event.deltaY * window.innerHeight
+      : event.deltaY;
 
 type Stage = { w: number; h: number };
 
@@ -130,8 +139,6 @@ export function WorksWheel({
   const [stage, setStage] = React.useState<Stage>({ w: 0, h: 0 });
   const [selected, setSelected] = React.useState<WorksWheelItem | null>(null);
   const pressed = React.useRef<{ x: number; y: number; index: number } | null>(null);
-  const endScrollGestures = React.useRef(0);
-  const endGestureTimer = React.useRef<number | null>(null);
   const endUnlocked = React.useRef(false);
 
   const count = items.length;
@@ -208,7 +215,7 @@ export function WorksWheel({
 
       for (let i = 0; i < count; i++) {
         const d = i - pos;
-        const drumDeg = d * STEP;
+        const drumDeg = -d * STEP;
         const card = cardRefs.current[i];
         if (card) {
           card.style.transform = place(
@@ -246,7 +253,6 @@ export function WorksWheel({
 
       // Returning from the last project to an earlier item resets the exit gate.
       if (clamped < last + 0.999) {
-        endScrollGestures.current = 0;
         endUnlocked.current = false;
       }
     },
@@ -255,6 +261,11 @@ export function WorksWheel({
 
   const drag = React.useRef<number | null>(null);
   const settling = React.useRef(0);
+  const pointerStartY = React.useRef<number | null>(null);
+  const pointerStartedAtStart = React.useRef(false);
+  const pointerStartedAtEnd = React.useRef(false);
+  const lastWheelAt = React.useRef(Number.NEGATIVE_INFINITY);
+  const burstStartedAtStart = React.useRef(false);
 
   // Native listener, because the wheel needs to be cancellable. Inside the
   // wheel it owns the scroll; at the final item we deliberately require a few
@@ -262,67 +273,60 @@ export function WorksWheel({
   React.useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-
-    const clearEndGestureTimer = () => {
-      if (endGestureTimer.current !== null) {
-        window.clearTimeout(endGestureTimer.current);
-        endGestureTimer.current = null;
-      }
-    };
-
     const onWheel = (event: WheelEvent) => {
       // Only take over while the wheel section is close to filling the viewport.
       if (Math.abs(el.getBoundingClientRect().top) > window.innerHeight * 0.15) return;
 
-      const direction = Math.sign(event.deltaY);
+      // Positive = scrolling down = forward, same as the page.
+      const pixels = wheelPixels(event);
+      const direction = Math.sign(pixels);
+      const atStart = target.current <= START_EPS;
       const atEnd = target.current >= last + 0.999;
 
-      // Scrolling back up immediately resets the exit gate.
-      if (direction < 0) {
-        endScrollGestures.current = 0;
-        endUnlocked.current = false;
-        clearEndGestureTimer();
+      // Remember whether this physical gesture began at the ring, so a flick that
+      // merely arrives there doesn't carry on out of the wheel.
+      const now = performance.now();
+      if (now - lastWheelAt.current > END_GESTURE_GAP) {
+        burstStartedAtStart.current = atStart;
       }
+      lastWheelAt.current = now;
 
-      // At the final project, hold the page for several separate downward
-      // wheel gestures. This gives the last project some breathing room before
-      // Contact can be reached. A continuous wheel/trackpad burst counts once.
-      if (direction > 0 && atEnd && !endUnlocked.current) {
-        const newGesture = endGestureTimer.current === null;
-
-        if (newGesture) {
-          const nextGesture = endScrollGestures.current + 1;
-          const shouldRelease = nextGesture >= END_SCROLL_GESTURES;
-          endScrollGestures.current = nextGesture;
-
-          if (shouldRelease) {
-            endUnlocked.current = true;
-            endScrollGestures.current = 0;
-            clearEndGestureTimer();
-          } else {
-            event.preventDefault();
-            event.stopPropagation();
-            endGestureTimer.current = window.setTimeout(() => {
-              endGestureTimer.current = null;
-            }, END_GESTURE_GAP);
-            return;
-          }
-        } else {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-      }
-
-      const next = target.current + event.deltaY / WHEEL_UNITS;
-      if (next > 0 && next < last + 1) {
+      // Sideways-only swipe: nothing to turn, just block browser back/forward.
+      if (direction === 0) {
         event.preventDefault();
-        event.stopPropagation(); // do not pass wheel input through to Lenis
+        return;
       }
-      to(next);
 
-      // A wheel gesture arrives as a burst of events with no explicit end, so
-      // settle to the nearest card after the burst stops.
+      
+    if (direction < 0) {
+        endUnlocked.current = false;
+
+        // Kalau sudah di awal ring, biarkan halaman scroll ke atas.
+        if (atStart && burstStartedAtStart.current) return;
+        }
+
+    // Di project terakhir, satu scroll maju langsung menuju Contact.
+    if (direction > 0 && atEnd) {
+    // Event berikutnya dibiarkan diteruskan ke Lenis.
+        if (endUnlocked.current) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        endUnlocked.current = true;
+
+        window.dispatchEvent(
+            new Event("portfolio:scroll-to-contact")
+        );
+
+        return;
+    }
+
+      // Scroll down (+) advances, scroll up (-) goes back.
+      event.preventDefault();
+      event.stopPropagation();
+      to(target.current + pixels / WHEEL_UNITS);
+
       window.clearTimeout(settling.current);
       settling.current = window.setTimeout(
         () => to(Math.round(target.current)),
@@ -334,7 +338,6 @@ export function WorksWheel({
     return () => {
       el.removeEventListener("wheel", onWheel);
       window.clearTimeout(settling.current);
-      clearEndGestureTimer();
     };
   }, [to, last]);
 
@@ -355,39 +358,119 @@ export function WorksWheel({
         aria-activedescendant={`works-wheel-${active}`}
         className="focus-visible:outline-foreground absolute inset-0 cursor-grab touch-pan-x outline-none focus-visible:outline-2 focus-visible:-outline-offset-4 active:cursor-grabbing"
         style={{ perspective: `${metrics.depth}px` }}
+        
         onPointerDown={(event) => {
-            drag.current = event.clientY;
-            const card = (event.target as HTMLElement).closest<HTMLElement>("[data-index]");
-            pressed.current = card
-                ? { x: event.clientX, y: event.clientY, index: Number(card.dataset.index) }
-                : null;
-            event.currentTarget.setPointerCapture(event.pointerId);
+          drag.current = event.clientY;
+          pointerStartY.current = event.clientY;
+          pointerStartedAtStart.current = target.current <= START_EPS;
+          pointerStartedAtEnd.current = target.current >= last + 0.999;
+
+          const card = (event.target as HTMLElement).closest<HTMLElement>(
+            "[data-index]",
+          );
+
+          pressed.current = card
+            ? {
+                x: event.clientX,
+                y: event.clientY,
+                index: Number(card.dataset.index),
+              }
+            : null;
+
+          event.currentTarget.setPointerCapture(event.pointerId);
         }}
+
         onPointerMove={(event) => {
           if (drag.current === null) return;
-          to(target.current + (drag.current - event.clientY) / DRAG_UNITS);
-          drag.current = event.clientY;
-        }}
-        onPointerUp={(event) => {
-            drag.current = null;
-            const p = pressed.current;
-            pressed.current = null;
 
-            // Klik (bukan drag): kartu depan membuka popup, kartu lain diputar ke depan
-            if (p && Math.hypot(event.clientX - p.x, event.clientY - p.y) < 6) {
-                setSelected(items[p.index]);
-                to(p.index + 1);
-                return;
-            }
-            // Land on an item rather than between two.
-            if (target.current > 1) to(Math.round(target.current));
+          // Finger/pointer moving UP = scrolling down = next project.
+          const step = (drag.current - event.clientY) / DRAG_UNITS;
+          drag.current = event.clientY;
+
+          // On the last project a forward touch swipe is counted on release.
+          if (
+            event.pointerType === "touch" &&
+            step > 0 &&
+            target.current >= last + 0.999
+          ) {
+            return;
+          }
+
+          to(target.current + step);
         }}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown") to(Math.round(target.current) + 1);
-          else if (event.key === "ArrowUp") to(Math.round(target.current) - 1);
-          else if (event.key === "Enter" && turn.current > 0.95) setSelected(items[active]);
-          else return;
-          event.preventDefault();
+
+        onPointerUp={(event) => {
+          const startY = pointerStartY.current;
+          const startedAtStart = pointerStartedAtStart.current;
+          const startedAtEnd = pointerStartedAtEnd.current;
+
+          // Negative = finger moved up; positive = finger moved down.
+          const deltaY = startY === null ? 0 : event.clientY - startY;
+          const swiped =
+            event.pointerType === "touch" && Math.abs(deltaY) > SWIPE_MIN;
+
+          drag.current = null;
+          pointerStartY.current = null;
+          pointerStartedAtStart.current = false;
+          pointerStartedAtEnd.current = false;
+
+          const p = pressed.current;
+          pressed.current = null;
+
+          // Swipe up on the last project = scroll down: counts towards Contact.
+          
+        if (
+            swiped &&
+            deltaY < 0 &&
+            startedAtEnd &&
+            target.current >= last + 0.999
+        ) {
+            event.preventDefault();
+            event.stopPropagation();
+
+        if (!endUnlocked.current) {
+            endUnlocked.current = true;
+
+            window.dispatchEvent(
+            new Event("portfolio:scroll-to-contact")
+            );
+        }
+
+        return;
+    }
+
+          // Swipe down on the ring = scroll up: ask the page to move back up.
+          if (
+            swiped &&
+            deltaY > 0 &&
+            startedAtStart &&
+            target.current <= START_EPS
+          ) {
+            window.dispatchEvent(new Event("portfolio:scroll-back"));
+            return;
+          }
+
+          // Tapping a card still opens it.
+          if (
+            p &&
+            Math.hypot(event.clientX - p.x, event.clientY - p.y) < 6
+          ) {
+            setSelected(items[p.index]);
+            to(p.index + 1);
+            return;
+          }
+
+          // Land on the nearest project (or the ring), like the wheel does.
+          to(Math.round(target.current));
+        }}
+
+        onPointerCancel={() => {
+          drag.current = null;
+          pointerStartY.current = null;
+          pointerStartedAtStart.current = false;
+          pointerStartedAtEnd.current = false;
+          pressed.current = null;
+          to(Math.round(target.current));
         }}
       >
         <div
