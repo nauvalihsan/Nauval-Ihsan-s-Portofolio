@@ -1,5 +1,5 @@
 import { works } from "../data";
-import WorksWheel from "./workswheels";
+import WorksWheel from "./WorksWheels";
 
 export default function Projects() {
   return (
