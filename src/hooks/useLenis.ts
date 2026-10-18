@@ -1,12 +1,9 @@
-
 import { useEffect } from "react";
 import Lenis from "lenis";
 
 export function useLenis() {
   useEffect(() => {
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let lenis: Lenis | null = null;
     let rafId = 0;
@@ -34,11 +31,13 @@ export function useLenis() {
       }
     };
 
-    const startNavigation = () => {
+    const CONTACT_DURATION = 1.8; // lebih lambat supaya transisi gradient terlihat
+
+    const startNavigation = (duration: number) => {
       programmaticScroll = true;
 
-      // Jangan biarkan snap menginterupsi perpindahan ke Contact.
-      ignoreSnapUntil = performance.now() + 1800;
+      // Jangan biarkan snap menginterupsi perpindahan (menu, Back to Top, Contact).
+      ignoreSnapUntil = performance.now() + duration * 1000 + 600;
       clearSnapTimer();
 
       if (navigationTimer !== null) {
@@ -49,76 +48,66 @@ export function useLenis() {
       navigationTimer = window.setTimeout(() => {
         programmaticScroll = false;
         navigationTimer = null;
-      }, 4000);
+      }, duration * 1000 + 2500);
     };
 
-    const scrollToTarget = (target: HTMLElement | number) => {
+    const scrollToTarget = (target: HTMLElement | number, duration = 1.2) => {
       if (lenis) {
-        startNavigation();
+        startNavigation(duration);
 
         lenis.scrollTo(target, {
-          duration: 1.2,
+          duration,
           lock: true,
           force: true,
           onComplete: finishNavigation,
         });
       } else if (typeof target === "number") {
-        window.scrollTo({
-          top: target,
-          behavior: "auto",
-        });
+        window.scrollTo({ top: target, behavior: "auto" });
       } else {
-        target.scrollIntoView({
-          behavior: "auto",
-          block: "start",
-        });
+        target.scrollIntoView({ behavior: "auto", block: "start" });
       }
     };
 
     const scrollToContact = () => {
-      const contactElement =
-        document.getElementById("contact");
+      const contactElement = document.querySelector<HTMLElement>("[data-contact]");
 
       if (!contactElement) {
-        console.warn(
-          'Element with id="contact" was not found.'
-        );
+        console.warn('Element with id="contact" was not found.');
         return;
       }
 
-      scrollToTarget(contactElement);
+      scrollToTarget(contactElement, CONTACT_DURATION);
     };
 
     const scrollBack = () => {
-      const top = Math.max(
-        0,
-        window.scrollY - window.innerHeight
-      );
-
+      const top = Math.max(0, window.scrollY - window.innerHeight);
       scrollToTarget(top);
     };
 
-    const removeWheelListeners = () => {
-      window.removeEventListener(
-        "portfolio:scroll-to-contact",
-        scrollToContact
-      );
+    const onAnchorClick = (event: MouseEvent) => {
+      const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#"]');
+      const hash = link?.getAttribute("href");
+      if (!hash || hash === "#") return;
 
-      window.removeEventListener(
-        "portfolio:scroll-back",
-        scrollBack
-      );
+      const target =
+        hash === "#contact"
+          ? document.querySelector<HTMLElement>("[data-contact]")
+          : document.querySelector<HTMLElement>(hash);
+      if (!target) return;
+
+      event.preventDefault();
+      scrollToTarget(target, hash === "#contact" ? CONTACT_DURATION : 1.2);
     };
 
-    window.addEventListener(
-      "portfolio:scroll-to-contact",
-      scrollToContact
-    );
+    const removeWheelListeners = () => {
+      document.removeEventListener("click", onAnchorClick);
+      window.removeEventListener("portfolio:scroll-to-contact", scrollToContact);
+      window.removeEventListener("portfolio:scroll-back", scrollBack);
+    };
 
-    window.addEventListener(
-      "portfolio:scroll-back",
-      scrollBack
-    );
+    window.addEventListener("portfolio:scroll-to-contact", scrollToContact);
+    window.addEventListener("portfolio:scroll-back", scrollBack);
+    document.addEventListener("click", onAnchorClick);
 
     if (reduceMotion) {
       return () => {
@@ -128,9 +117,9 @@ export function useLenis() {
       };
     }
 
+    // anchors dimatikan: klik link "#..." sekarang ditangani onAnchorClick
     const instance = new Lenis({
       duration: 1.2,
-      anchors: true,
     });
 
     lenis = instance;
@@ -146,16 +135,11 @@ export function useLenis() {
 
     instance.on("scroll", () => {
       const direction =
-        instance.scroll > previousScroll
-          ? 1
-          : instance.scroll < previousScroll
-            ? -1
-            : 0;
+        instance.scroll > previousScroll ? 1 : instance.scroll < previousScroll ? -1 : 0;
 
       previousScroll = instance.scroll;
 
-      // Penting: jangan snap ketika sedang menuju Contact
-      // atau ketika animasi perpindahan baru saja selesai.
+      // Jangan snap saat perpindahan terprogram atau baru saja selesai.
       if (
         programmaticScroll ||
         performance.now() < ignoreSnapUntil ||
@@ -166,26 +150,16 @@ export function useLenis() {
       }
 
       const viewportHeight = window.innerHeight;
-      const snapElements =
-        document.querySelectorAll<HTMLElement>(
-          "[data-snap]"
-        );
+      const snapElements = document.querySelectorAll<HTMLElement>("[data-snap]");
 
       for (const element of snapElements) {
         if (snapping || programmaticScroll) break;
 
         const top = element.getBoundingClientRect().top;
 
-        const approaching =
-          (top > 4 && direction > 0) ||
-          (top < -4 && direction < 0);
+        const approaching = (top > 4 && direction > 0) || (top < -4 && direction < 0);
 
-        if (
-          !approaching ||
-          Math.abs(top) > viewportHeight * 0.5
-        ) {
-          continue;
-        }
+        if (!approaching || Math.abs(top) > viewportHeight * 0.5) continue;
 
         snapping = true;
 
@@ -199,10 +173,7 @@ export function useLenis() {
           onComplete: clearSnapTimer,
         });
 
-        snapTimer = window.setTimeout(
-          clearSnapTimer,
-          1500
-        );
+        snapTimer = window.setTimeout(clearSnapTimer, 1500);
 
         break;
       }

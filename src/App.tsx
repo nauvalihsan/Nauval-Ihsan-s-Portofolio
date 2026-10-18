@@ -3,7 +3,6 @@ import { useLenis } from "./hooks/useLenis";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import About from "./components/About";
-import Experience from "./components/Experience";
 import Projects from "./components/Projects";
 import Contact from "./components/Contact";
 import DarkVeil from "./components/DarkVeil";
@@ -30,7 +29,7 @@ export default function App() {
         <main className="relative z-10">
           <Hero />
           <About />
-          <Experience />
+        
 
           {/* Long, quiet fade from the animated world into solid black. */}
           <div className="projects-transition" aria-hidden="true" />

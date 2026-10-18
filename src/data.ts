@@ -2,7 +2,7 @@
 export const profile = {
   name: "Andi Muhammad Nauval Ihsan Fairell",
   major: "Computer Science · BINUS University",
-  photo: "Foto.JPG",
+  photo: "Foto2.jpeg",
   cv: "/Nauval Ihsan CV.pdf",
   focusedOn: ["Web Development", "Mobile App Development", "UI/UX Design", "Software Design"],
 };
@@ -10,22 +10,17 @@ export const profile = {
 export const menu = [
   { label: "Home", href: "#home" },
   { label: "About", href: "#about" },
-  { label: "Experience", href: "#experience" },
   { label: "Project", href: "#projects" },
   { label: "Contact", href: "#contact" },
 ];
 
 export const about = {
-  text: "I am a Frontend Developer passionate about bridging design and engineering. I specialize in building responsive, accessible, and fast web applications using modern JavaScript frameworks. With a strong eye for UI/UX details, I turn complex ideas into clean, maintainable code.",
+  text: "I am a Computer Science student who enjoys building digital products from start to finish: understanding what users need, designing the interface, structuring the software, and shipping it as a web or mobile app. I care about clean, maintainable code and interfaces that feel simple to use.",
   quote: "Building high-performance web applications with clean, intuitive interfaces.",
-  skills: ["Figma", "HTML", "CSS", "JavaScript", "TypeScript", "React", "Vue", "Vite", "Tailwind CSS"],
+  skills: ["Figma", "HTML", "CSS", "JavaScript", "TypeScript", "React", "Vue", "Vite", "Tailwind CSS", "Supabase", "Node.js", "Android Studio"],
   focus: ["Web Development", "Mobile App Development", "UI/UX Design", "Software Design"],
 };
 
-export const experience = [
-  { period: "-", org: "", points: [
-  ] },
-];
 
 export const works = [
   { 

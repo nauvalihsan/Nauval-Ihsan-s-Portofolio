@@ -1,5 +1,4 @@
-import { useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import { profile } from "../data";
 import { ease } from "../lib/motion";
 import SplitHeading from "./SplitHeading";
@@ -8,9 +7,6 @@ import FocusedOn from "./FocusedOn";
 const pill = "rounded-full border px-5 py-2 text-sm font-medium transition-colors duration-300 md:text-base";
 
 export default function Hero() {
-  const photoRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: photoRef, offset: ["start end", "end start"] });
-  const y = useTransform(scrollYProgress, [0, 1], ["-8%", "8%"]);
 
   return (
     <section id="home" className="relative min-h-screen overflow-hidden px-6 pb-24 pt-32 md:px-12">
@@ -49,13 +45,12 @@ export default function Hero() {
         </div>
 
         <motion.div
-          ref={photoRef}
           initial={{ clipPath: "inset(100% 0 0 0)" }}
           animate={{ clipPath: "inset(0% 0 0 0)" }}
           transition={{ delay: 0.5, duration: 1.1, ease }}
           className="aspect-[3/4] w-full max-w-sm justify-self-center overflow-hidden rounded-3xl bg-[#d9d9d9] md:justify-self-end"
         >
-          {profile.photo && <motion.img src={profile.photo} alt={profile.name} style={{ y, scale: 1.2 }} className="size-full object-cover" />}
+          {profile.photo && <img src={profile.photo} alt={profile.name} className="size-full object-cover object-top" />}
         </motion.div>
       </div>
     </section>
