@@ -1,4 +1,3 @@
-// Ganti semua isi di file ini dengan data kamu.
 export const profile = {
   name: "Andi Muhammad Nauval Ihsan Fairell",
   major: "Computer Science · BINUS University",

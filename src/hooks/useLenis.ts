@@ -31,12 +31,11 @@ export function useLenis() {
       }
     };
 
-    const CONTACT_DURATION = 1.8; // lebih lambat supaya transisi gradient terlihat
+    const CONTACT_DURATION = 1.8;
 
     const startNavigation = (duration: number) => {
       programmaticScroll = true;
 
-      // Jangan biarkan snap menginterupsi perpindahan (menu, Back to Top, Contact).
       ignoreSnapUntil = performance.now() + duration * 1000 + 600;
       clearSnapTimer();
 
@@ -44,7 +43,6 @@ export function useLenis() {
         window.clearTimeout(navigationTimer);
       }
 
-      // Fallback jika animasi tidak memanggil onComplete.
       navigationTimer = window.setTimeout(() => {
         programmaticScroll = false;
         navigationTimer = null;
@@ -117,7 +115,6 @@ export function useLenis() {
       };
     }
 
-    // anchors dimatikan: klik link "#..." sekarang ditangani onAnchorClick
     const instance = new Lenis({
       duration: 1.2,
     });
@@ -139,7 +136,6 @@ export function useLenis() {
 
       previousScroll = instance.scroll;
 
-      // Jangan snap saat perpindahan terprogram atau baru saja selesai.
       if (
         programmaticScroll ||
         performance.now() < ignoreSnapUntil ||
